@@ -10,7 +10,7 @@ try:
 except ImportError:
     missing_packages.add("python3-numpy")
 try:
-    from scipy.optimize.minpack import leastsq
+    from scipy.optimize import leastsq
 except ImportError:
     missing_packages.add("python3-scipy")
 def test_program(program, package_name):
@@ -24,7 +24,7 @@ if os.name == 'nt':
     # the ImageMagick's convert.exe by full path; this path can be set in the environment variable IM_CONVERT,
     # or the default installation path is used
     convert_program = os.environ.get("IM_CONVERT", "C:\\Program Files\\ImageMagick\\convert.exe")
-test_program("dcraw", "dcraw")
+test_program("dcraw_emu", "libraw-bin")
 test_program(convert_program, "imagemagick")
 test_program("tca_correct", "hugin-tools")
 test_program("exiv2", "exiv2")
@@ -33,7 +33,7 @@ if missing_packages:
           format("  ".join(missing_packages)))
     sys.exit()
 try:
-    dcraw_version = float(subprocess.Popen(["dcraw"], stdout=subprocess.PIPE).communicate()[0].splitlines()[1].
+    dcraw_version = float(subprocess.Popen(["dcraw_emu"], stdout=subprocess.PIPE).communicate()[0].splitlines()[1].
                           rpartition("v")[2])
 except:
     dcraw_version = 0
@@ -42,7 +42,12 @@ h_option = [] if 8.99 < dcraw_version < 9.18 else ["-h"]
 
 parser = argparse.ArgumentParser(description="Calibration generator for Lensfun.")
 parser.add_argument("--complex-tca", action="store_true", help="switches on non-linear polynomials for TCA")
+parser.add_argument("--verbose", action="store_true", help="enable verbose logging")
 args = parser.parse_args()
+
+def log(msg):
+    if args.verbose:
+        print(f"[INFO] {msg}")
 
 
 def unquote_filename_component(name):
@@ -117,13 +122,13 @@ def generate_raw_conversion_call(filename, dcraw_options):
         result = [convert_program, filename]
         if "-4" in dcraw_options:
             result.extend(["-colorspace", "RGB", "-depth", "16"])
-        result.append("tiff:-" if "-c" in dcraw_options else basename + ".tiff")
+        result.append("tiff:-" if "-" in dcraw_options else basename + ".tiff")
         return result
     else:
-        return ["dcraw", "-T", "-t", "0"] + dcraw_options + [filename]
+        return ["dcraw_emu", "-T", "-t", "0"] + dcraw_options + [filename]
 
 
-raw_file_extensions = ["3fr", "ari", "arw", "bay", "crw", "cr2", "cap", "dcs", "dcr", "dng", "drf", "eip", "erf", "fff",
+raw_file_extensions = ["3fr", "ari", "arw", "bay", "crw", "cr2", "cr3", "cap", "dcs", "dcr", "dng", "drf", "eip", "erf", "fff",
                        "iiq", "k25", "kdc", "mef", "mos", "mrw", "nef", "nrw", "obm", "orf", "pef", "ptx", "pxn", "r3d",
                        "raf", "raw", "rwl", "rw2", "rwz", "sr2", "srf", "srw", "x3f", "jpg", "jpeg", "tif"]
 def find_raw_files():
@@ -145,6 +150,7 @@ def browse_directory(directory):
                          float(match.group("focal_length")), float(match.group("aperture")))
                 else:
                     exiv2_candidates.append(full_filename)
+
 def call_exiv2(candidate_group):
     exiv2_process = subprocess.Popen(
         ["exiv2", "-PEkt", "-g", "Exif.Photo.LensModel", "-g", "Exif.Photo.FocalLength", "-g", "Exif.Photo.FNumber"]
@@ -169,12 +175,13 @@ def call_exiv2(candidate_group):
     for filename, exif_data in result.copy().items():
         result[filename] = tuple(exif_data)
     return result
+
 def generate_tca_tiffs(filename):
     tca_filename = filename + ".tca"
     if not os.path.exists(tca_filename):
         tiff_filename = os.path.splitext(filename)[0] + ".tiff"
         if not os.path.exists(tiff_filename):
-            subprocess.check_call(generate_raw_conversion_call(filename, ["-4", "-o", "0", "-M"]))
+            subprocess.check_call(generate_raw_conversion_call(filename, ["-4", "-o", "0", "-M", "-Z", "tiff"]))
         return filename, tiff_filename, tca_filename
     return None, None, None
 
@@ -199,7 +206,7 @@ def evaluate_image_set(exif_data, filepaths):
                 for line in sidecar_file:
                     if line.startswith("maximal_radius"):
                         maximal_radius = float(line.partition(":")[2])
-            dcraw_process = subprocess.Popen(generate_raw_conversion_call(filepath, ["-4", "-M", "-o", "0", "-c"] + h_option),
+            dcraw_process = subprocess.Popen(generate_raw_conversion_call(filepath, ["-4", "-M", "-o", "0", "-Z", "-"] + h_option),
                                              stdout=subprocess.PIPE)
             image_data = subprocess.check_output(
                 [convert_program, "tiff:-", "-set", "colorspace", "RGB", "-resize", "250", "pgm:-"], stdin=dcraw_process.stdout,
@@ -272,6 +279,7 @@ if __name__ == '__main__':
     #
     # Collect EXIF data
     #
+    log("Collecting EXIF data")
 
     file_exif_data = {}
     filepath_pattern = re.compile(r"(?P<lens_model>.+)--(?P<focal_length>[0-9.]+)mm--(?P<aperture>[0-9.]+)")
@@ -303,7 +311,7 @@ if __name__ == '__main__':
             if not missing_lens_model_warning_printed:
                 print(filename + ":")
                 print("""I couldn't detect the lens model name and assumed "Standard".
-For cameras without interchangable lenses, this may be correct.
+For cameras without interchangeable lenses, this may be correct.
 However, this fails if there is data of different undetectable lenses.
 A newer version of exiv2 (if available) may help.
 (This message is printed only once.)\n""")
@@ -320,6 +328,7 @@ You have to rename them according to the scheme "Lens_name--16mm--1.4.RAW"
     #
     # Generation TIFFs from distortion RAWs
     #
+    log("Generating TIFFs from distortion RAWs")
 
     if os.path.exists("distortion"):
         with chdir("distortion"):
@@ -327,7 +336,7 @@ You have to rename them according to the scheme "Lens_name--16mm--1.4.RAW"
             results = set()
             for filename in find_raw_files():
                 if not os.path.exists(os.path.splitext(filename)[0] + ".tiff"):
-                    results.add(pool.apply_async(subprocess.call, [generate_raw_conversion_call(filename, ["-w"])]))
+                    results.add(pool.apply_async(subprocess.call, [generate_raw_conversion_call(filename, ["-w", "-Z", "tiff"])]))
             pool.close()
             pool.join()
             [result.get() for result in results]
@@ -336,7 +345,9 @@ You have to rename them according to the scheme "Lens_name--16mm--1.4.RAW"
     #
     # Parse/generate lenses.txt
     #
-
+    
+    log("Parsing/generating lenses.txt")
+    
     lens_line_pattern = re.compile(
         r"(?P<name>.+):\s*(?P<maker>[^,]+)\s*,\s*(?P<mount>[^,]+)\s*,\s*(?P<cropfactor>[^,]+)"
         r"(\s*,\s*(?P<aspect_ratio>\d+:\d+|[0-9.]+))?(\s*,\s*(?P<type>[^,]+))?")
@@ -399,8 +410,10 @@ You have to rename them according to the scheme "Lens_name--16mm--1.4.RAW"
     #
     # TCA correction
     #
+    log("Running TCA correction")
 
     if os.path.exists("tca"):
+        
         with chdir("tca"):
             pool = multiprocessing.Pool()
             results = set()
@@ -438,10 +451,11 @@ pause -1""".format(filename, data["br"], data["vr"], data["bb"], data["vb"]))
     #
     # Vignetting
     #
-
+    log("Running vignetting correction")
+    
     images = {}
     distances_per_triplett = {}
-
+        
     for vignetting_directory in glob.glob("vignetting*"):
         distance = float(vignetting_directory.partition("_")[2] or "inf")
         assert distance == float("inf") or distance < 1000
@@ -490,7 +504,7 @@ pause -1""".format(filename, data["br"], data["vr"], data["bb"], data["vb"]))
             print("""Lens "{0}" not found in lenses.txt.  Abort.""".format(lens))
             sys.exit()
 
-
+    log("Updating lensfun.xml")
     outfile = open("lensfun.xml", "w")
     outfile.write("<lensdatabase>\n")
     for lens in sorted(lenses.values()):

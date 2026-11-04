@@ -12,13 +12,6 @@
 
 #include "lensfun.h"
 
-#if !defined(__APPLE__) && !defined(__FreeBSD__) && !defined(__OpenBSD__) && !defined(__DragonFly__)
-#include <malloc.h>
-#endif
-#ifdef __APPLE__
-#include <sys/malloc.h>
-#endif
-
 #include "common_code.hpp"
 
 typedef struct
@@ -31,37 +24,30 @@ typedef struct
 
 typedef struct
 {
-  bool            reverse;
-  gchar          *tcaModel;
-  lfLensCalibTCA  calib;
-  size_t          alignment;
+  bool    reverse;
+  float   scale;
+  size_t  alignment;
 } lfTestParams;
 
 // setup a standard lens
 void mod_setup(lfFixture *lfFix, gconstpointer data)
 {
+  (void)data;
   lfTestParams *p = (lfTestParams *)data;
 
   lfFix->lens             = new lfLens();
+  //lfFix->lens->CropFactor = 1.0f;
   lfFix->lens->Type       = LF_RECTILINEAR;
-  lfFix->lens->CropFactor  = 1.0;
-  lfFix->lens->AspectRatio = 1.5;
-
-  lfFix->lens->AddCalibTCA(&p->calib);
 
   lfFix->img_height = 300;
   lfFix->img_width  = 300;
 
-  lfFix->mod = new lfModifier(lfFix->lens, 1.0f, lfFix->img_width, lfFix->img_height);
-
-  lfFix->mod->Initialize(
-    lfFix->lens, LF_PF_F32,
-    24.0f, 2.8f, 1000.0f, 1.0f, LF_RECTILINEAR,
-    LF_MODIFY_TCA, p->reverse);
+  lfFix->mod = new lfModifier(lfFix->lens, 24.0f, 1.0f, lfFix->img_width, lfFix->img_height, LF_PF_F32, p->reverse);
+  lfFix->mod->EnableScaling(p->scale);
 
   lfFix->coordBuff = NULL;
 
-  const size_t bufsize = 2 * 3 * lfFix->img_width * lfFix->img_height * sizeof(float);
+  const size_t bufsize = 2 * lfFix->img_width * lfFix->img_height * sizeof(float);
   if(p->alignment == 0)
     lfFix->coordBuff = g_malloc(bufsize);
   else
@@ -70,6 +56,7 @@ void mod_setup(lfFixture *lfFix, gconstpointer data)
 
 void mod_teardown(lfFixture *lfFix, gconstpointer data)
 {
+  (void)data;
   lfTestParams *p = (lfTestParams *)data;
 
   if(p->alignment == 0)
@@ -81,28 +68,30 @@ void mod_teardown(lfFixture *lfFix, gconstpointer data)
   delete lfFix->lens;
 }
 
-void test_mod_subpix(lfFixture *lfFix, gconstpointer data)
+void test_mod_coord_scale(lfFixture *lfFix, gconstpointer data)
 {
+  (void)data;
   for(size_t y = 0; y < lfFix->img_height; y++)
   {
-    float *coordData = (float *)lfFix->coordBuff + (size_t)2 * 3 * y * lfFix->img_width;
+    float *coordData = (float *)lfFix->coordBuff + (size_t)2 * y * lfFix->img_width;
 
     g_assert_true(
-      lfFix->mod->ApplySubpixelDistortion(0.0, y, lfFix->img_width, 1, coordData)
+      lfFix->mod->ApplyGeometryDistortion(0.0, y, lfFix->img_width, 1, coordData)
     );
   }
 }
 
 #ifdef _OPENMP
-void test_mod_subpix_parallel(lfFixture *lfFix, gconstpointer data)
+void test_mod_coord_scale_parallel(lfFixture *lfFix, gconstpointer data)
 {
+  (void)data;
   #pragma omp parallel for schedule(static)
   for(int y = 0; y < static_cast<int>(lfFix->img_height); y++)
   {
-    float *coordData = (float *)lfFix->coordBuff + (size_t)2 * 3 * y * lfFix->img_width;
+    float *coordData = (float *)lfFix->coordBuff + (size_t)2 * y * lfFix->img_width;
 
     g_assert_true(
-      lfFix->mod->ApplySubpixelDistortion(0.0, y, lfFix->img_width, 1, coordData)
+      lfFix->mod->ApplyGeometryDistortion(0.0, y, lfFix->img_width, 1, coordData)
     );
   }
 }
@@ -114,10 +103,10 @@ gchar *describe(lfTestParams *p, const char *prefix)
   g_snprintf(alignment, sizeof(alignment), "%lu-byte", p->alignment);
 
   return g_strdup_printf(
-           "/%s/%s/%s/%s",
+           "/%s/%s/%f/%s",
            prefix,
-           p->reverse ? "UnTCA" : "TCA",
-           p->tcaModel,
+           p->reverse ? "unScale" : "Scale",
+           p->scale,
            p->alignment == 0 ? "unaligned" : alignment
          );
 }
@@ -126,25 +115,17 @@ void add_set_item(lfTestParams *p)
 {
   gchar *desc = NULL;
 
-  desc = describe(p, "modifier/subpix/serialFor");
-  g_test_add(desc, lfFixture, p, mod_setup, test_mod_subpix, mod_teardown);
+  desc = describe(p, "modifier/coord/serialFor");
+  g_test_add(desc, lfFixture, p, mod_setup, test_mod_coord_scale, mod_teardown);
   g_free(desc);
   desc = NULL;
 
 #ifdef _OPENMP
-  desc = describe(p, "modifier/subpix/parallelFor");
-  g_test_add(desc, lfFixture, p, mod_setup, test_mod_subpix_parallel, mod_teardown);
+  desc = describe(p, "modifier/coord/parallelFor");
+  g_test_add(desc, lfFixture, p, mod_setup, test_mod_coord_scale_parallel, mod_teardown);
   g_free(desc);
   desc = NULL;
 #endif
-}
-
-void free_params(gpointer mem)
-{
-  lfTestParams *p = (lfTestParams *)mem;
-
-  g_free(p->tcaModel);
-  g_free(mem);
 }
 
 int main(int argc, char **argv)
@@ -161,19 +142,11 @@ int main(int argc, char **argv)
 
   for(std::vector<bool>::iterator it_reverse = reverse.begin(); it_reverse != reverse.end(); ++it_reverse)
   {
-    std::map<std::string, lfLensCalibTCA> tcaCalib;
-    // ??? + Nikon AF-S DX Nikkor 35mm f/1.8G
-    tcaCalib["LF_TCA_MODEL_LINEAR"] = lfLensCalibTCA
-    {
-      LF_TCA_MODEL_LINEAR, 35.0f, {1.0003f, 1.0003f}
-    };
-    // Canon EOS 5D Mark III + Canon EF 24-70mm f/2.8L II USM
-    tcaCalib["LF_TCA_MODEL_POLY3"] = lfLensCalibTCA
-    {
-      LF_TCA_MODEL_POLY3,  24.0f, {1.0002104f, 1.0000529f, 0.0f, 0.0f, -0.0000220f, -0.0000000f}
-    };
+    std::vector<float> scale;
+    scale.push_back(0.75f);
+    scale.push_back(1.25f);
 
-    for(std::map<std::string, lfLensCalibTCA>::iterator it_tcaCalib = tcaCalib.begin(); it_tcaCalib != tcaCalib.end(); ++it_tcaCalib)
+    for(std::vector<float>::iterator it_scale = scale.begin(); it_scale != scale.end(); ++it_scale)
     {
       std::vector<size_t> align;
       align.push_back(0);
@@ -186,8 +159,7 @@ int main(int argc, char **argv)
         lfTestParams *p = (lfTestParams *)g_malloc(sizeof(lfTestParams));
 
         p->reverse   = *it_reverse;
-        p->tcaModel  = g_strdup(it_tcaCalib->first.c_str());
-        p->calib     = it_tcaCalib->second;
+        p->scale     = *it_scale;
         p->alignment = *it_align;
 
         add_set_item(p);
@@ -199,7 +171,7 @@ int main(int argc, char **argv)
 
   const int res = g_test_run();
 
-  g_slist_free_full(slist, (GDestroyNotify)free_params);
+  g_slist_free_full(slist, (GDestroyNotify)g_free);
 
   return res;
 }

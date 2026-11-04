@@ -18,14 +18,18 @@
         <compat>Canon FL</compat>
         <compat>Contax/Yashica</compat>
         <compat>Contax G</compat>
+        <compat>Fujifilm G</compat>
         <compat>Fujifilm X</compat>
         <compat>Hasselblad 500</compat>
         <compat>Hasselblad H</compat>
+        <compat>Hasselblad X</compat>
         <compat>Leica M</compat>
         <compat>Leica R</compat>
         <compat>Leica S</compat>
+        <compat>Leica L</compat>
         <compat>M42</compat>
         <compat>M39/1</compat>
+        <compat>M39</compat>
         <compat>DKL</compat>
         <compat>Mamiya 645</compat>
         <compat>Micro 4/3 System</compat>
@@ -39,6 +43,7 @@
         <compat>Nikon F AI-S</compat>
         <compat>Nikon Z</compat>
         <compat>Olympus OM</compat>
+        <compat>Pentax 645AF2</compat>
         <compat>Pentax Q</compat>
         <compat>Pentax K</compat>
         <compat>Pentax KA</compat>
@@ -57,6 +62,15 @@
         <compat>C</compat>
         <compat>Kiev 88</compat>
     </mount>
+
+    <camera>
+        <maker>Generic</maker>
+        <maker lang="de">Generisch</maker>
+        <model>Crop-factor 0.8 (Medium Format)</model>
+        <model lang="de">Crop-Faktor 0.8 (Mittelformat)</model>
+        <mount>Generic</mount>
+        <cropfactor>0.79</cropfactor>
+    </camera>
 
     <camera>
         <maker>Generic</maker>

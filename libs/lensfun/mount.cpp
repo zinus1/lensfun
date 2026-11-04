@@ -27,9 +27,11 @@ lfMount::lfMount (const lfMount &other)
     Compat = NULL;
 
     MountCompat.clear();
-    const char* const* otherMounts = other.GetCompats();
-    for (int i = 0; otherMounts[i]; i++)
-        AddCompat(otherMounts[i]);
+    if (auto* otherMounts = other.GetCompats())
+    {
+        for (int i = 0; otherMounts[i]; i++)
+            AddCompat(otherMounts[i]);
+    }
 }
 
 lfMount &lfMount::operator = (const lfMount &other)
@@ -38,10 +40,14 @@ lfMount &lfMount::operator = (const lfMount &other)
     Name = lf_mlstr_dup (other.Name);
     Compat = NULL;
 
+    for (char* m: MountCompat)
+        free(m);
     MountCompat.clear();
-    const char* const* otherMounts = other.GetCompats();
-    for (int i = 0; otherMounts[i]; i++)
-        AddCompat(otherMounts[i]);
+    if (auto* otherMounts = other.GetCompats())
+    {
+        for (int i = 0; otherMounts[i]; i++)
+            AddCompat(otherMounts[i]);
+    }
 
     return *this;
 }
@@ -87,11 +93,6 @@ bool lfMount::Check ()
 
 
 //---------------------------// The C interface //---------------------------//
-
-lfMount *lf_mount_new ()
-{
-    return new lfMount ();
-}
 
 lfMount *lf_mount_create ()
 {

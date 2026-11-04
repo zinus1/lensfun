@@ -16,10 +16,10 @@ import shutil
 def find_best(root, tagname):
     texts = [(len(element.text), element.text) for element in root.findall(tagname) if element.attrib.get("lang") == "en"]
     if texts:
-        return sorted(texts)[0][1]
-    texts = [(len(element.text), element.text) for element in root.findall(tagname)]
+        return (texts)[0][1]
+    texts = [(len(element.text), element.text) for element in root.findall(tagname) if not element.attrib.get("lang")]
     if texts:
-        return sorted(texts)[0][1]
+        return (texts)[0][1]
     else: 
         return None
 
@@ -47,7 +47,7 @@ class Lens:
     def __init__(self, element, root, camtype):
         self.maker = find_best(element, "maker")
         self.model = find_best(element, "model")
-        if camtype == "compact":
+        if self.model.startswith("fixed lens"):
             mount = element.find("mount").text
             for camera in root.findall("camera"):
                 if camera.find("mount").text == mount:
@@ -57,7 +57,7 @@ class Lens:
                     if variant:
                         camname = camname + " " + variant
                     break
-            self.model = "Fixed lens {}".format(camname)
+            self.model = "{}, {}".format(camname,self.model)
         try:
             self.crop = float(element.find("cropfactor").text)
         except:
@@ -76,7 +76,7 @@ class Lens:
 # Main routine
 #----------------------------------------------------------------------
 
-# set up the commandline parser and define some arguemnts
+# set up the commandline parser and define some arguments
 parser = argparse.ArgumentParser(description='Create a list of all cameras and lenses in the Lensfun database.')
 parser.add_argument('db_path', metavar='DB_PATH', help='path to the Lensfun database', default='/usr/share/lensfun/', nargs='?')
 parser.add_argument('-g', dest='git', action='store_true', help='use current database from git repository')
@@ -87,7 +87,7 @@ parser.add_argument('-o', dest='outfile', action='store', help='output filename 
 cmdline_args = vars(parser.parse_args())
 
 
-# decide wether to get the most up to date database from git or use the locally installed database
+# decide whether to get the most up to date database from git or use the locally installed database
 if cmdline_args['git']==True:
     XmlDBPath = os.path.join(tempfile.gettempdir(), "lensfun")
     print("~ Lensfun database is retrieved directly from git")

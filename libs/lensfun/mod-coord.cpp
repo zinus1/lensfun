@@ -34,8 +34,7 @@
 #include <limits>
 #include <cassert>
 
-lfLensCalibDistortion rescale_polynomial_coefficients (const lfLensCalibDistortion& lcd_,
-                                                       double real_focal, cbool Reverse)
+lfLensCalibDistortion rescale_polynomial_coefficients (const lfLensCalibDistortion& lcd_, double real_focal)
 {
     // FixMe: The ACM probably bases on the nominal focal length.  This needs
     // to be found out.  It this is true, we have to scale its coefficient by
@@ -73,7 +72,7 @@ lfLensCalibDistortion rescale_polynomial_coefficients (const lfLensCalibDistorti
 
 int lfModifier::EnableDistortionCorrection (const lfLensCalibDistortion& lcd_)
 {
-    const lfLensCalibDistortion lcd = rescale_polynomial_coefficients (lcd_, RealFocal, Reverse);
+    const lfLensCalibDistortion lcd = rescale_polynomial_coefficients (lcd_, RealFocal);
     if (Reverse)
         switch (lcd.Model)
         {
@@ -196,7 +195,6 @@ int lfModifier::EnableProjectionTransform (lfLensType target_projection)
                     return EnabledMods;
 
                 default:
-                    // keep gcc 4.4+ happy
                     break;
             }
             break;
@@ -220,7 +218,6 @@ int lfModifier::EnableProjectionTransform (lfLensType target_projection)
                     return EnabledMods;
 
                 default:
-                    // keep gcc 4.4+ happy
                     break;
             }
             break;
@@ -244,7 +241,6 @@ int lfModifier::EnableProjectionTransform (lfLensType target_projection)
                     return EnabledMods;
 
                 default:
-                    // keep gcc 4.4+ happy
                     break;
             }
             break;
@@ -268,64 +264,63 @@ int lfModifier::EnableProjectionTransform (lfLensType target_projection)
                     return EnabledMods;
 
                 default:
-                    // keep gcc 4.4+ happy
                     break;
             }
-        case LF_FISHEYE_ORTHOGRAPHIC:
-        case LF_FISHEYE_STEREOGRAPHIC:
-        case LF_FISHEYE_EQUISOLID:
-        case LF_FISHEYE_THOBY:
-        case LF_UNKNOWN:
+
         default:
             break;
-    };
+    }
 
     bool successFrom = false;
-    bool succesTo = false;
+    bool successTo = false;
 
     //convert from input projection to target projection via equirectangular projection
     switch(to)
     {
         case LF_RECTILINEAR:
             AddCoordGeomCallback (ModifyCoord_Geom_Rect_ERect, 500);
-            succesTo = true;
+            successTo = true;
             break;
 
         case LF_FISHEYE:
             AddCoordGeomCallback (ModifyCoord_Geom_FishEye_ERect, 500);
-            succesTo = true;
+            successTo = true;
             break;
 
         case LF_PANORAMIC:
             AddCoordGeomCallback (ModifyCoord_Geom_Panoramic_ERect, 500);
-            succesTo = true;
+            successTo = true;
             break;
 
         case LF_FISHEYE_ORTHOGRAPHIC:
             AddCoordGeomCallback (ModifyCoord_Geom_Orthographic_ERect, 500);
-            succesTo = true;
+            successTo = true;
             break;
 
         case LF_FISHEYE_STEREOGRAPHIC:
             AddCoordGeomCallback (ModifyCoord_Geom_Stereographic_ERect, 500);
-            succesTo = true;
+            successTo = true;
             break;
 
         case LF_FISHEYE_EQUISOLID:
             AddCoordGeomCallback (ModifyCoord_Geom_Equisolid_ERect, 500);
-            succesTo = true;
+            successTo = true;
             break;
 
         case LF_FISHEYE_THOBY:
             AddCoordGeomCallback (ModifyCoord_Geom_Thoby_ERect, 500);
-            succesTo = true;
+            successTo = true;
             break;
 
         case LF_EQUIRECTANGULAR:
-        default:
             //nothing to do
+            successTo = true;
             break;
-    };
+
+        case LF_UNKNOWN:
+            break;
+    }
+
     switch(from)
     {
         case LF_RECTILINEAR:
@@ -364,14 +359,17 @@ int lfModifier::EnableProjectionTransform (lfLensType target_projection)
             break;
 
         case LF_EQUIRECTANGULAR:
-        default:
             //nothing to do
+            successFrom = true;
             break;
-    };
 
-    assert(successFrom == succesTo);
+        case LF_UNKNOWN:
+            break;
+    }
 
-    if (successFrom && succesTo)
+    assert(successFrom == successTo);
+
+    if (successFrom && successTo)
         EnabledMods |= LF_MODIFY_GEOMETRY;
 
     return EnabledMods;
@@ -536,7 +534,7 @@ bool lfModifier::ApplyGeometryDistortion (
         for (auto cb : CoordCallbacks)
             cb->callback (cb, res, width);
 
-        // Convert normalized coordinates back into natural coordiates
+        // Convert normalized coordinates back into natural coordinates
         for (i = 0; i < width; i++)
         {
             res [0] = (res [0] + CenterX) * NormUnScale;
@@ -783,6 +781,7 @@ void lfModifier::ModifyCoord_Dist_ACM (void *data, float *iocoord, int count)
 
 void lfModifier::ModifyCoord_Geom_FishEye_Rect (void *data, float *iocoord, int count)
 {
+    (void)data;
     for (float *end = iocoord + count * 2; iocoord < end; iocoord += 2)
     {
         float x = iocoord [0];
@@ -805,6 +804,7 @@ void lfModifier::ModifyCoord_Geom_FishEye_Rect (void *data, float *iocoord, int 
 
 void lfModifier::ModifyCoord_Geom_Rect_FishEye (void *data, float *iocoord, int count)
 {
+    (void)data;
     for (float *end = iocoord + count * 2; iocoord < end; iocoord += 2)
     {
         float x = iocoord [0];
@@ -824,6 +824,7 @@ void lfModifier::ModifyCoord_Geom_Rect_FishEye (void *data, float *iocoord, int 
 void lfModifier::ModifyCoord_Geom_Panoramic_Rect (
     void *data, float *iocoord, int count)
 {
+    (void)data;
     for (float *end = iocoord + count * 2; iocoord < end; iocoord += 2)
     {
         float x = iocoord [0];
@@ -838,6 +839,7 @@ void lfModifier::ModifyCoord_Geom_Panoramic_Rect (
 void lfModifier::ModifyCoord_Geom_Rect_Panoramic (
     void *data, float *iocoord, int count)
 {
+    (void)data;
     for (float *end = iocoord + count * 2; iocoord < end; iocoord += 2)
     {
         float x = iocoord [0];
@@ -851,6 +853,7 @@ void lfModifier::ModifyCoord_Geom_Rect_Panoramic (
 void lfModifier::ModifyCoord_Geom_FishEye_Panoramic (
     void *data, float *iocoord, int count)
 {
+    (void)data;
     for (float *end = iocoord + count * 2; iocoord < end; iocoord += 2)
     {
         float x = iocoord [0];
@@ -870,6 +873,7 @@ void lfModifier::ModifyCoord_Geom_FishEye_Panoramic (
 void lfModifier::ModifyCoord_Geom_Panoramic_FishEye (
     void *data, float *iocoord, int count)
 {
+    (void)data;
     for (float *end = iocoord + count * 2; iocoord < end; iocoord += 2)
     {
         float x = iocoord [0];
@@ -891,6 +895,7 @@ void lfModifier::ModifyCoord_Geom_Panoramic_FishEye (
 
 void lfModifier::ModifyCoord_Geom_ERect_Rect (void *data, float *iocoord, int count)
 {
+    (void)data;
     for (float *end = iocoord + count * 2; iocoord < end; iocoord += 2)
     {
         float x = iocoord [0];
@@ -915,6 +920,7 @@ void lfModifier::ModifyCoord_Geom_ERect_Rect (void *data, float *iocoord, int co
 
 void lfModifier::ModifyCoord_Geom_Rect_ERect (void *data, float *iocoord, int count)
 {
+    (void)data;
     for (float *end = iocoord + count * 2; iocoord < end; iocoord += 2)
     {
         float x = iocoord [0];
@@ -927,6 +933,7 @@ void lfModifier::ModifyCoord_Geom_Rect_ERect (void *data, float *iocoord, int co
 
 void lfModifier::ModifyCoord_Geom_ERect_FishEye (void *data, float *iocoord, int count)
 {
+    (void)data;
     for (float *end = iocoord + count * 2; iocoord < end; iocoord += 2)
     {
         float x = iocoord [0];
@@ -960,6 +967,7 @@ void lfModifier::ModifyCoord_Geom_ERect_FishEye (void *data, float *iocoord, int
 
 void lfModifier::ModifyCoord_Geom_FishEye_ERect (void *data, float *iocoord, int count)
 {
+    (void)data;
     for (float *end = iocoord + count * 2; iocoord < end; iocoord += 2)
     {
         float x = iocoord [0];
@@ -978,12 +986,14 @@ void lfModifier::ModifyCoord_Geom_FishEye_ERect (void *data, float *iocoord, int
 
 void lfModifier::ModifyCoord_Geom_ERect_Panoramic (void *data, float *iocoord, int count)
 {
+    (void)data;
     for (float *end = iocoord + count * 2; iocoord < end; iocoord += 2)
         iocoord [1] = tan (iocoord [1]);
 }
 
 void lfModifier::ModifyCoord_Geom_Panoramic_ERect (void *data, float *iocoord, int count)
 {
+    (void)data;
     for (float *end = iocoord + count * 2; iocoord < end; iocoord += 2)
     {
         iocoord [1] = atan (iocoord [1]);
@@ -992,6 +1002,7 @@ void lfModifier::ModifyCoord_Geom_Panoramic_ERect (void *data, float *iocoord, i
 
 void lfModifier::ModifyCoord_Geom_Orthographic_ERect (void *data, float *iocoord, int count)
 {
+    (void)data;
     for (float *end = iocoord + count * 2; iocoord < end; iocoord += 2)
     {
         float x = iocoord [0];
@@ -1015,10 +1026,11 @@ void lfModifier::ModifyCoord_Geom_Orthographic_ERect (void *data, float *iocoord
         iocoord [0] = atan2 (vy, vx);
         iocoord [1] = atan (s * theta * sin (phi) / sqrt (vx * vx + vy * vy));
     }
-};
+}
 
 void lfModifier::ModifyCoord_Geom_ERect_Orthographic (void *data, float *iocoord, int count)
 {
+    (void)data;
     for (float *end = iocoord + count * 2; iocoord < end; iocoord += 2)
     {
         float x = iocoord [0];
@@ -1046,12 +1058,13 @@ void lfModifier::ModifyCoord_Geom_ERect_Orthographic (void *data, float *iocoord
         iocoord [0] = rho * cos (x);
         iocoord [1] = rho * sin (x);
      }
-};
+}
 
 #define EPSLN   1.0e-10
 
 void lfModifier::ModifyCoord_Geom_Stereographic_ERect (void *data, float *iocoord, int count)
 {
+    (void)data;
     for (float *end = iocoord + count * 2; iocoord < end; iocoord += 2)
     {
         float x = iocoord [0];
@@ -1080,10 +1093,11 @@ void lfModifier::ModifyCoord_Geom_Stereographic_ERect (void *data, float *iocoor
             };
         };
     };
-};
+}
 
 void lfModifier::ModifyCoord_Geom_ERect_Stereographic (void *data, float *iocoord, int count)
 {
+    (void)data;
     for (float *end = iocoord + count * 2; iocoord < end; iocoord += 2)
     {
         float lon = iocoord [0];
@@ -1095,10 +1109,11 @@ void lfModifier::ModifyCoord_Geom_ERect_Stereographic (void *data, float *iocoor
         iocoord [0] = ksp * cosphi * sin (lon);
         iocoord [1] = ksp * sin (lat);
     }
-};
+}
 
 void lfModifier::ModifyCoord_Geom_Equisolid_ERect (void *data, float *iocoord, int count)
 {
+    (void)data;
     for (float *end = iocoord + count * 2; iocoord < end; iocoord += 2)
     {
         float x = iocoord [0];
@@ -1121,10 +1136,11 @@ void lfModifier::ModifyCoord_Geom_Equisolid_ERect (void *data, float *iocoord, i
         iocoord [0] = atan2 (vy, vx);
         iocoord [1] = atan (s * theta * sin (phi) / sqrt (vx * vx + vy * vy));
     };
-};
+}
 
 void lfModifier::ModifyCoord_Geom_ERect_Equisolid (void *data, float *iocoord, int count)
 {    
+    (void)data;
     for (float *end = iocoord + count * 2; iocoord < end; iocoord += 2)
     {
         double lambda = iocoord [0];
@@ -1143,13 +1159,14 @@ void lfModifier::ModifyCoord_Geom_ERect_Equisolid (void *data, float *iocoord, i
             iocoord [1] = k1 * sin (phi);
         };
     };
-};
+}
 
 #define THOBY_K1_PARM 1.47F
 #define THOBY_K2_PARM 0.713F
 
 void lfModifier::ModifyCoord_Geom_Thoby_ERect (void *data, float *iocoord, int count)
 {
+    (void)data;
     for (float *end = iocoord + count * 2; iocoord < end; iocoord += 2)
     {
         float x = iocoord [0];
@@ -1174,10 +1191,11 @@ void lfModifier::ModifyCoord_Geom_Thoby_ERect (void *data, float *iocoord, int c
             iocoord [1] = atan (s * theta * sin (phi) / sqrt (vx * vx + vy * vy));
         };
     };
-};
+}
 
 void lfModifier::ModifyCoord_Geom_ERect_Thoby (void *data, float *iocoord, int count)
 {
+    (void)data;
     for (float *end = iocoord + count * 2; iocoord < end; iocoord += 2)
     {
         float x = iocoord [0];
@@ -1205,7 +1223,7 @@ void lfModifier::ModifyCoord_Geom_ERect_Thoby (void *data, float *iocoord, int c
         iocoord [0] = rho * cos (x);
         iocoord [1] = rho * sin (x);
     };
-};
+}
 
 //---------------------------// The C interface //---------------------------//
 

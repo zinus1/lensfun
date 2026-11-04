@@ -1,5 +1,5 @@
-# require at least cmake 2.8
-CMAKE_MINIMUM_REQUIRED(VERSION 2.8 FATAL_ERROR )
+# require at least cmake 3.12
+CMAKE_MINIMUM_REQUIRED(VERSION 3.12 FATAL_ERROR)
 
 # path for helper modules
 set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" "${CMAKE_SOURCE_DIR}/cmake/modules")
@@ -8,20 +8,20 @@ GET_FILENAME_COMPONENT(SOURCE_BASE_DIR ${CMAKE_SOURCE_DIR} PATH CACHE)
 #  global setup
 project(lensfun C CXX)
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 IF (MSVC)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W4")
 ELSE()
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wformat-security")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wformat-security -pedantic -Wextra -fexceptions")
 ENDIF()
 
 # version
 SET(VERSION_MAJOR 0)
 SET(VERSION_MINOR 3)
-SET(VERSION_MICRO 95)
+SET(VERSION_MICRO 99)
 SET(VERSION_BUGFIX 0)
 SET(VERSION_API 2)
 # This is the version of the *shipped* database, which is not necessarily the
@@ -137,7 +137,7 @@ IF(WIN32)
           SET(NEW_FLAGS "${CMAKE_${TYPE}_FLAGS${CFG}}")
           # fix up static libc flags
           STRING(REPLACE "/MD" "/MT" NEW_FLAGS "${NEW_FLAGS}")
-          # *FORCE* to override whats already placed into the cache
+          # *FORCE* to override what's already placed into the cache
           SET(CMAKE_${TYPE}_FLAGS${CFG} "${NEW_FLAGS}" CACHE STRING
             "CMAKE_${TYPE}_FLAGS${CFG} (overwritten to ensure static build)" FORCE)
         ENDFOREACH(CFG)
@@ -195,7 +195,7 @@ ENDIF()
 
 IF(WIN32 AND NOT BUILD_STATIC)
   FIND_FILE(GLIB2_DLL
-            NAMES glib-2.dll glib-2-vs9.dll
+            NAMES glib-2.0-0.dll glib-2.dll glib-2-vs9.dll
             PATHS "${GLIB2_BASE_DIR}/bin"
             NO_SYSTEM_ENVIRONMENT_PATH)
   INSTALL(FILES ${GLIB2_DLL} DESTINATION ${CMAKE_INSTALL_BINDIR})

@@ -1,6 +1,8 @@
 
- Github [![CMake](https://github.com/lensfun/lensfun/actions/workflows/cmake.yml/badge.svg)](https://github.com/lensfun/lensfun/actions/workflows/cmake.yml)
- AppVeyor [![AppVeyor Build Status](https://ci.appveyor.com/api/projects/status/github/lensfun/lensfun?branch=master&svg=true)](https://ci.appveyor.com/project/seebk/lensfun)
+[![CMake-Linux](https://github.com/lensfun/lensfun/actions/workflows/cmake-linux.yml/badge.svg)](https://github.com/lensfun/lensfun/actions/workflows/cmake-linux.yml)
+[![CMake-macOS](https://github.com/lensfun/lensfun/actions/workflows/cmake-macos.yml/badge.svg)](https://github.com/lensfun/lensfun/actions/workflows/cmake-macos.yml)
+[![CMake-MSYS2](https://github.com/lensfun/lensfun/actions/workflows/cmake-msys2.yml/badge.svg)](https://github.com/lensfun/lensfun/actions/workflows/cmake-msys2.yml)
+[![CMake-Windows](https://github.com/lensfun/lensfun/actions/workflows/cmake-windows.yml/badge.svg)](https://github.com/lensfun/lensfun/actions/workflows/cmake-windows.yml)
 
 WHAT IS IT
 ----------
@@ -118,6 +120,8 @@ in your cmake_build folder.
 If you prefer setting the configuration with a GUI or want to get an extensive
 overview of all available settings and cache values run cmake-gui.
 
+*NB* Certificate Authorities' (CA) certificates have to be available on a system
+in order to run `apps/lensfun-update-data` script.
 
 DOCUMENTATION
 -------------

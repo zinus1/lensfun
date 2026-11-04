@@ -1,26 +1,28 @@
-#if !defined(__APPLE__) && !defined(__FreeBSD__) && !defined(__OpenBSD__) && !defined(__DragonFly__)
-#include <malloc.h>
-#endif
-#ifdef __APPLE__
-#include <sys/malloc.h>
-#endif
+#ifndef COMMON_CODE_HPP
+#define COMMON_CODE_HPP
+#include <cstdlib>
 
-void *lf_alloc_align(size_t alignment, size_t size)
-{
-#ifdef _WIN32
-  return _aligned_malloc(size, alignment);
+void* lf_alloc_align(size_t alignment, size_t size) {
+#ifdef _WIN32  // std::aligned_alloc isn't supported in Microsoft C Runtime library
+    return _aligned_malloc(size, alignment);
 #else
-  void *ptr = NULL;
-  if(posix_memalign(&ptr, alignment, size) != 0)
-    return NULL;
-  return ptr;
+    // std::aligned_alloc requires size to be an integral multiple of alignment,
+    // otherwise it might return nullptr.
+    const size_t remainder = size % alignment;
+    if (remainder != 0) {
+        // adjust size to be multiple of alignment
+        size += alignment - remainder;
+    }
+    return std::aligned_alloc(alignment, size);
 #endif
 }
+
+void lf_free_align(void* mem) {
 #ifdef _WIN32
-void lf_free_align(void *mem)
-{
-  _aligned_free(mem);
-}
+    _aligned_free(mem);
 #else
-#define lf_free_align(A) free(A)
+    std::free(mem);
 #endif
+}
+
+#endif // COMMON_CODE_HPP

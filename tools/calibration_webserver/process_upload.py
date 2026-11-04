@@ -3,10 +3,10 @@
 """This script takes the location of a file archive (e.g. a tarball) as its
 argument and converts it into an extracted set of files in the same directory.
 Moreover, all image files are renamed so that the most important image
-parameters like the focal length are included into the filename.  Futhermore, a
+parameters like the focal length are included into the filename.  Furthermore, a
 GitHub issue is created in the “lensfun/lensfun” repository.  Finally, the
-ownCloud command line client is called for pushing the new files to the
-ownCloud server for the calibrators to pick them up.
+Nextcloud command line client is called for pushing the new files to the
+Nextcloud server for the calibrators to pick them up.
 
 Besides the archive file, it expects a file ``originator.json`` in the same
 directory which contains only one string, which is the email address of the
@@ -19,7 +19,7 @@ This script works in two modes of operation:
 2. The first argument is "amended" and the second the absolute path to a
    directory.  This happens if the first processing resulted in missing EXIF
    data, and the user has provided it, and now the final stages of processing
-   (e.g. GitHub issue, ownCloud synchronisation) can be performed.  The
+   (e.g. GitHub issue, Nextcloud synchronisation) can be performed.  The
    directory is in this case the directory into which the original tarball was
    extracted.
 
@@ -31,7 +31,7 @@ success message in their browser.
 import sys, os, subprocess, json, re, multiprocessing, smtplib, configparser, logging
 from email.mime.text import MIMEText
 from github import Github
-from calibration_webserver import owncloud, utils
+from calibration_webserver import nextcloud, utils
 
 
 logging.basicConfig(level=logging.DEBUG, filename="/var/log/process_upload.log")
@@ -142,12 +142,12 @@ def handle_successful_upload():
     """Make all necessary steps after a successful upload.  This encompasses:
 
     1. Creation of an GitHub issue.
-    2. Synchronisation of the ownCloud directory.
+    2. Synchronisation of the Nextcloud directory.
     3. Sending of a success email to the uploader.
     """
     issue_link = sync_with_github()
     send_success_email(issue_link)
-    owncloud.sync()
+    nextcloud.sync()
 
 
 def write_result_and_exit(error, missing_data=[]):
@@ -362,57 +362,28 @@ def collect_exif_data():
 
     raw_files = []
     ignored_directories = {"__MACOSX"}
-    cr3_files = False
     for root, dirnames, filenames in os.walk(directory, topdown=True):
         dirnames[:] = [directory for directory in dirnames if directory not in ignored_directories]
         for filename in filenames:
-            file_extension = os.path.splitext(filename)[1].lower()[1:]
-            cr3_files = cr3_files or file_extension == "cr3"
-            if file_extension in raw_file_extensions:
+            if os.path.splitext(filename)[1].lower()[1:] in raw_file_extensions:
                 raw_files.append(os.path.join(root, filename))
+
     file_exif_data = {}
-    if cr3_files:
-        write_result_and_exit("Sorry, we use dcraw and exiv2, and both don’t support CR3 files yet.")
-        output = subprocess.run(["exiftool", "-s", "-Make", "-Model", "-LensModel", "-FocalLength", "-FNumber"] + raw_files,
-                                check=True, universal_newlines=True,
-                                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL).stdout
-        if len(raw_files) == 1:
-            current_path = raw_files[0]
-            file_exif_data[current_path] = [None, None, None, float("nan"), float("nan")]
-        for line in output.splitlines():
-            __, prefix, path = line.partition("======== ")
-            if prefix:
-                current_path = path
-                file_exif_data[current_path] = [None, None, None, float("nan"), float("nan")]
-            elif not line.startswith(" "):
-                key, colon, value = line.partition(":")
-                assert colon
-                key = key.strip()
-                value = value.lstrip()
-                if key == "FocalLength":
-                    value = float(value.partition(" ")[0])
-                if key == "FNumber":
-                    value = float(value)
-                key_index = {"Make": 0, "Model": 1, "LensModel": 2, "FocalLength": 3, "FNumber": 4}[key]
-                file_exif_data[current_path][key_index] = value
-        for filepath, exif_data in file_exif_data.copy().items():
-            file_exif_data[filepath] = tuple(exif_data)
-    else:
-        raw_files_per_group = len(raw_files) // multiprocessing.cpu_count() + 1
-        raw_file_groups = []
-        while raw_files:
-            raw_file_group = raw_files[:raw_files_per_group]
-            if raw_file_group:
-                raw_file_groups.append(raw_file_group)
-            del raw_files[:raw_files_per_group]
-        pool = multiprocessing.Pool()
-        try:
-            for group_exif_data in pool.map(call_exiv2, raw_file_groups):
-                file_exif_data.update(group_exif_data)
-        except InvalidRaw as error:
-            write_result_and_exit(error.args[0])
-        pool.close()
-        pool.join()
+    raw_files_per_group = len(raw_files) // multiprocessing.cpu_count() + 1
+    raw_file_groups = []
+    while raw_files:
+        raw_file_group = raw_files[:raw_files_per_group]
+        if raw_file_group:
+            raw_file_groups.append(raw_file_group)
+        del raw_files[:raw_files_per_group]
+    pool = multiprocessing.Pool()
+    try:
+        for group_exif_data in pool.map(call_exiv2, raw_file_groups):
+            file_exif_data.update(group_exif_data)
+    except InvalidRaw as error:
+        write_result_and_exit(error.args[0])
+    pool.close()
+    pool.join()
     return file_exif_data
 
 
@@ -495,15 +466,15 @@ class GithubConfiguration:
 
 def quote_directory(path):
     """Walks through `path` and escapes all names of files and directories.  After
-    this operation, the directory can be safely transferred with ownCloud.
+    this operation, the directory can be safely transferred with Nextcloud.
     Moreover, Hugin will not complain about the filenames.  *Important*: This
     function is idempotent.
 
     :param str path: the path to the directory to be escaped
     """
     def quote_filename_component(name):
-        """Escapes `name` so that it can be safely used as a filename in ownCloud or
-        Hugin.  *Important*: This function is idempotent.
+        """Escapes `name` so that it can be safely used as a filename in Nextcloud
+        or Hugin.  *Important*: This function is idempotent.
 
         :param str name: the name to be escaped
 
